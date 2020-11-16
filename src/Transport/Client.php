@@ -2,6 +2,7 @@
 
 namespace Smalot\Cups\Transport;
 
+use GuzzleHttp\Psr7\Message;
 use GuzzleHttp\Psr7\Uri;
 use Http\Client\Common\Plugin\AddHostPlugin;
 use Http\Client\Common\Plugin\ContentLengthPlugin;
@@ -10,7 +11,6 @@ use Http\Client\Common\Plugin\ErrorPlugin;
 use Http\Client\Common\PluginClient;
 use Http\Client\HttpClient;
 use Http\Client\Socket\Client as SocketHttpClient;
-use Http\Message\MessageFactory\GuzzleMessageFactory;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Smalot\Cups\CupsException;
@@ -70,7 +70,7 @@ class Client implements HttpClient
 			$socketClientOptions['remote_socket'] = self::SOCKET_URL;
 		}
 
-		$messageFactory = new GuzzleMessageFactory();
+		$messageFactory = new Message();
 		$socketClient = new SocketHttpClient($messageFactory, $socketClientOptions);
 		$host = preg_match(
 			'/unix:\/\//',
@@ -78,7 +78,7 @@ class Client implements HttpClient
 		) ? 'http://localhost' : $socketClientOptions['remote_socket'];
 		$this->httpClient = new PluginClient(
 			$socketClient, [
-				new ErrorPlugin(),
+				new ErrorPlugin(['only_server_exception' => true]),
 				new ContentLengthPlugin(),
 				new DecoderPlugin(),
 				new AddHostPlugin(new Uri($host)),
