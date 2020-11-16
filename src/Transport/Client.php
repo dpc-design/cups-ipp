@@ -12,6 +12,7 @@ use Http\Client\HttpClient;
 use Http\Client\Socket\Client as SocketHttpClient;
 use Http\Message\MessageFactory\GuzzleMessageFactory;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Smalot\Cups\CupsException;
 
 /**
@@ -22,119 +23,119 @@ use Smalot\Cups\CupsException;
 class Client implements HttpClient
 {
 
-    const SOCKET_URL = 'unix:///var/run/cups/cups.sock';
+	const SOCKET_URL = 'unix:///var/run/cups/cups.sock';
 
-    const AUTHTYPE_BASIC = 'basic';
+	const AUTHTYPE_BASIC = 'basic';
 
-    const AUTHTYPE_DIGEST = 'digest';
+	const AUTHTYPE_DIGEST = 'digest';
 
-    /**
-     * @var HttpClient
-     */
-    protected $httpClient;
+	/**
+	 * @var HttpClient
+	 */
+	protected $httpClient;
 
-    /**
-     * @var string
-     */
-    protected $authType;
+	/**
+	 * @var string
+	 */
+	protected $authType;
 
-    /**
-     * @var string
-     */
-    protected $username;
+	/**
+	 * @var string
+	 */
+	protected $username;
 
-    /**
-     * @var string
-     */
-    protected $password;
+	/**
+	 * @var string
+	 */
+	protected $password;
 
-    /**
-     * Client constructor.
-     *
-     * @param string $username
-     * @param string $password
-     * @param array $socketClientOptions
-     */
-    public function __construct($username = null, $password = null, $socketClientOptions = [])
-    {
-        if (!is_null($username)) {
-            $this->username = $username;
-        }
+	/**
+	 * Client constructor.
+	 *
+	 * @param string $username
+	 * @param string $password
+	 * @param array $socketClientOptions
+	 */
+	public function __construct($username = null, $password = null, $socketClientOptions = [])
+	{
+		if (!is_null($username)) {
+			$this->username = $username;
+		}
 
-        if (!is_null($password)) {
-            $this->password = $password;
-        }
+		if (!is_null($password)) {
+			$this->password = $password;
+		}
 
-        if (empty($socketClientOptions['remote_socket'])) {
-            $socketClientOptions['remote_socket'] = self::SOCKET_URL;
-        }
+		if (empty($socketClientOptions['remote_socket'])) {
+			$socketClientOptions['remote_socket'] = self::SOCKET_URL;
+		}
 
-        $messageFactory = new GuzzleMessageFactory();
-        $socketClient = new SocketHttpClient($messageFactory, $socketClientOptions);
-        $host = preg_match(
-          '/unix:\/\//',
-          $socketClientOptions['remote_socket']
-        ) ? 'http://localhost' : $socketClientOptions['remote_socket'];
-        $this->httpClient = new PluginClient(
-          $socketClient, [
-            new ErrorPlugin(),
-            new ContentLengthPlugin(),
-            new DecoderPlugin(),
-            new AddHostPlugin(new Uri($host)),
-          ]
-        );
+		$messageFactory = new GuzzleMessageFactory();
+		$socketClient = new SocketHttpClient($messageFactory, $socketClientOptions);
+		$host = preg_match(
+			'/unix:\/\//',
+			$socketClientOptions['remote_socket']
+		) ? 'http://localhost' : $socketClientOptions['remote_socket'];
+		$this->httpClient = new PluginClient(
+			$socketClient, [
+				new ErrorPlugin(),
+				new ContentLengthPlugin(),
+				new DecoderPlugin(),
+				new AddHostPlugin(new Uri($host)),
+			]
+		);
 
-        $this->authType = self::AUTHTYPE_BASIC;
-    }
+		$this->authType = self::AUTHTYPE_BASIC;
+	}
 
-    /**
-     * @param string $username
-     * @param string $password
-     *
-     * @return $this
-     */
-    public function setAuthentication($username, $password)
-    {
-        $this->username = $username;
-        $this->password = $password;
+	/**
+	 * @param string $username
+	 * @param string $password
+	 *
+	 * @return $this
+	 */
+	public function setAuthentication($username, $password)
+	{
+		$this->username = $username;
+		$this->password = $password;
 
-        return $this;
-    }
+		return $this;
+	}
 
-    /**
-     * @param string $authType
-     *
-     * @return $this
-     */
-    public function setAuthType($authType)
-    {
-        $this->authType = $authType;
+	/**
+	 * @param string $authType
+	 *
+	 * @return $this
+	 */
+	public function setAuthType($authType)
+	{
+		$this->authType = $authType;
 
-        return $this;
-    }
+		return $this;
+	}
 
-    /**
-     * (@inheritdoc}
-     */
-    public function sendRequest(RequestInterface $request)
-    {
-        if ($this->username || $this->password) {
-            switch ($this->authType) {
-                case self::AUTHTYPE_BASIC:
-                    $pass = base64_encode($this->username.':'.$this->password);
-                    $authentication = 'Basic '.$pass;
-                    break;
+	/**
+	 * (@inheritdoc}
+	 */
+	public function sendRequest(RequestInterface $request): ResponseInterface
+	{
+		if ($this->username || $this->password) {
+			switch ($this->authType) {
+				case self::AUTHTYPE_BASIC:
+					$pass = base64_encode($this->username . ':' . $this->password);
+					$authentication = 'Basic ' . $pass;
+					break;
 
-                case self::AUTHTYPE_DIGEST:
-                    throw new CupsException('Auth type not supported');
+				case self::AUTHTYPE_DIGEST:
+					throw new CupsException('Auth type not supported');
 
-                default:
-                    throw new CupsException('Unknown auth type');
-            }
+				default:
+					throw new CupsException('Unknown auth type');
+			}
 
-            $request = $request->withHeader('Authorization', $authentication);
-        }
+			$request = $request->withHeader('Authorization', $authentication);
+		}
 
-        return $this->httpClient->sendRequest($request);
-    }
+		return $this->httpClient->sendRequest($request);
+	}
 }
